@@ -1,0 +1,942 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI Risk — Signal Review Panel</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@300;400;500&display=swap');
+
+  :root {
+    --bg: #0a0c0f;
+    --surface: #111318;
+    --border: #1e2229;
+    --border-bright: #2e3340;
+    --text: #c8cdd8;
+    --text-dim: #555f72;
+    --text-bright: #e8ecf4;
+    --accent: #00d4a0;
+    --accent-dim: rgba(0,212,160,0.12);
+    --red: #ff4a6e;
+    --red-dim: rgba(255,74,110,0.12);
+    --mono: 'IBM Plex Mono', monospace;
+    --sans: 'IBM Plex Sans', sans-serif;
+    --shadow: none;
+  }
+  :root.light {
+    --bg: #f5f4f0;
+    --surface: #ffffff;
+    --border: #dddbd4;
+    --border-bright: #c5c2b8;
+    --text: #3a3830;
+    --text-dim: #9a9588;
+    --text-bright: #1a1814;
+    --accent: #00956f;
+    --accent-dim: rgba(0,149,111,0.10);
+    --red: #d93257;
+    --red-dim: rgba(217,50,87,0.10);
+    --shadow: 0 1px 3px rgba(0,0,0,0.08);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    font-size: 13px;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    transition: background 0.2s, color 0.2s;
+  }
+
+  /* ── HEADER ── */
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 24px;
+    border-bottom: 1px solid var(--border);
+    position: sticky;
+    top: 0;
+    background: var(--bg);
+    z-index: 100;
+    gap: 16px;
+  }
+  .logo {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.15em;
+    color: var(--accent);
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+  .logo span { color: var(--text-dim); }
+  nav { display: flex; gap: 0; }
+  nav button {
+    background: none;
+    border: 1px solid transparent;
+    color: var(--text-dim);
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.1em;
+    padding: 6px 16px;
+    cursor: pointer;
+    transition: all 0.15s;
+    text-transform: uppercase;
+  }
+  nav button:hover { color: var(--text-bright); }
+  nav button.active {
+    color: var(--accent);
+    border-color: var(--border-bright);
+    background: var(--surface);
+  }
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 16px;
+    height: 16px;
+    border-radius: 4px;
+    font-size: 9px;
+    font-family: var(--mono);
+    margin-left: 6px;
+    padding: 0 4px;
+  }
+  .badge-green { background: var(--accent-dim); color: var(--accent); }
+  .badge-red   { background: var(--red-dim);    color: var(--red); }
+  .badge-dim   { background: var(--border);      color: var(--text-dim); }
+
+  /* ── HEADER RIGHT ── */
+  .header-right { display: flex; align-items: center; gap: 12px; flex-shrink: 0; }
+
+  /* ── FETCH BUTTON ── */
+  .btn-fetch {
+    display: flex; align-items: center; gap: 6px;
+    background: none;
+    border: 1px solid var(--border-bright);
+    color: var(--text-dim);
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.08em;
+    padding: 5px 12px;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.15s;
+    white-space: nowrap;
+  }
+  .btn-fetch:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+  .btn-fetch:disabled { opacity: 0.45; cursor: not-allowed; }
+  .fetch-icon { font-size: 13px; display: inline-block; }
+  .btn-fetch.fetching .fetch-icon { animation: spin 0.8s linear infinite; }
+  .last-fetched {
+    font-family: var(--mono);
+    font-size: 9px;
+    color: var(--text-dim);
+    white-space: nowrap;
+  }
+
+  /* ── THEME TOGGLE ── */
+  .theme-toggle { display: flex; align-items: center; gap: 7px; }
+  .toggle-switch { position: relative; width: 36px; height: 20px; cursor: pointer; }
+  .toggle-switch input { display: none; }
+  .toggle-track {
+    position: absolute; inset: 0; border-radius: 10px;
+    background: var(--border-bright); border: 1px solid var(--border-bright);
+    transition: background 0.2s;
+  }
+  .toggle-switch input:checked + .toggle-track { background: var(--accent); border-color: var(--accent); }
+  .toggle-thumb {
+    position: absolute; top: 3px; left: 3px;
+    width: 12px; height: 12px; border-radius: 50%;
+    background: #fff; transition: transform 0.2s; pointer-events: none;
+  }
+  .toggle-switch input:checked ~ .toggle-thumb { transform: translateX(16px); }
+  .toggle-icon { font-size: 12px; line-height: 1; }
+
+  /* ── PAGES ── */
+  .page { display: none; flex: 1; padding: 20px 24px; }
+  .page.active { display: block; }
+
+  /* ── TOOLBAR ── */
+  .toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 14px;
+    gap: 16px;
+    flex-wrap: wrap;
+  }
+  .kb-hint {
+    display: flex; gap: 14px;
+    font-family: var(--mono); font-size: 10px;
+    color: var(--text-dim); align-items: center; flex-shrink: 0;
+  }
+  .kb-hint .key {
+    display: inline-block;
+    border: 1px solid var(--border-bright); border-radius: 3px;
+    padding: 1px 5px; font-size: 10px; color: var(--text-dim); margin-right: 2px;
+  }
+  .filters { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+  .filter-group { display: flex; align-items: center; gap: 7px; }
+  .filter-label {
+    font-family: var(--mono); font-size: 9px; letter-spacing: 0.1em;
+    color: var(--text-dim); text-transform: uppercase; white-space: nowrap;
+  }
+  .filter-select {
+    font-family: var(--mono); font-size: 10px;
+    color: var(--text-bright); background: var(--surface);
+    border: 1px solid var(--border-bright); border-radius: 4px;
+    padding: 5px 26px 5px 9px; cursor: pointer; outline: none;
+    appearance: none; -webkit-appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23555f72'/%3E%3C/svg%3E");
+    background-repeat: no-repeat; background-position: right 9px center;
+    transition: border-color 0.15s; box-shadow: var(--shadow);
+  }
+  .filter-select:hover, .filter-select:focus { border-color: var(--accent); }
+  .filter-select option { background: var(--surface); color: var(--text-bright); }
+
+  /* ── ERROR BANNER ── */
+  .fetch-error {
+    background: var(--red-dim); border: 1px solid var(--red);
+    border-radius: 4px; padding: 10px 14px; margin-bottom: 14px;
+    font-family: var(--mono); font-size: 10px; color: var(--red); line-height: 1.5;
+  }
+
+  /* ── TABLE ── */
+  .feed-table { width: 100%; border-collapse: collapse; }
+  .feed-table thead tr { border-bottom: 1px solid var(--border-bright); }
+  .feed-table th {
+    font-family: var(--mono); font-size: 9px; letter-spacing: 0.12em;
+    text-transform: uppercase; color: var(--text-dim);
+    padding: 8px 12px; text-align: left; font-weight: 500;
+  }
+  .feed-table tbody tr {
+    border-bottom: 1px solid var(--border); transition: background 0.1s; cursor: pointer;
+  }
+  .feed-table tbody tr:hover  { background: var(--surface); }
+  .feed-table tbody tr.selected {
+    background: rgba(0,212,160,0.06); border-left: 2px solid var(--accent);
+  }
+  .feed-table tbody tr.approved { opacity: 0.5; }
+  .feed-table tbody tr.rejected { opacity: 0.5; }
+  .feed-table td { padding: 10px 12px; vertical-align: top; }
+
+  .td-idx { width: 36px; font-family: var(--mono); font-size: 10px; color: var(--text-dim); text-align: right; padding-right: 8px; }
+  .td-title { width: 26%; }
+  .title-text { font-weight: 500; color: var(--text-bright); line-height: 1.4; font-size: 12px; display: block; }
+  .status-dot { width: 7px; height: 7px; border-radius: 50%; display: inline-block; margin-right: 5px; flex-shrink: 0; vertical-align: middle; }
+  .dot-pending  { background: var(--text-dim); }
+  .dot-approved { background: var(--accent); }
+  .dot-rejected { background: var(--red); }
+
+  /* feed / category tags */
+  .tag {
+    display: inline-block; font-family: var(--mono); font-size: 9px;
+    padding: 2px 6px; border-radius: 3px;
+    background: var(--border); color: var(--text-dim);
+    text-transform: uppercase; letter-spacing: 0.08em; white-space: nowrap;
+  }
+  .tag-cyber   { background: rgba(255,74,110,0.13); color: #ff4a6e; }
+  .tag-bio     { background: rgba(120,200,80,0.13); color: #7ac850; }
+  .tag-control { background: rgba(255,170,0,0.13);  color: #ffaa00; }
+  .tag-manip   { background: rgba(160,100,255,0.13);color: #a064ff; }
+  .tag-general { background: rgba(0,180,255,0.13);  color: #00b4ff; }
+
+  .td-snippet { color: var(--text); line-height: 1.55; font-size: 12px; }
+  .snippet-full { display: none; }
+  .expand-btn {
+    background: none; border: none; color: var(--accent);
+    font-family: var(--mono); font-size: 11px;
+    cursor: pointer; padding: 0 0 0 3px;
+    display: inline; vertical-align: middle; line-height: 1;
+  }
+  .td-link a {
+    font-family: var(--mono); font-size: 10px; color: var(--text-dim);
+    text-decoration: none; border-bottom: 1px solid var(--border-bright);
+    transition: color 0.15s; word-break: break-all;
+  }
+  .td-link a:hover { color: var(--accent); border-color: var(--accent); }
+  .td-actions { width: 72px; text-align: center; white-space: nowrap; }
+  .action-btn {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 28px; height: 28px; border-radius: 5px;
+    border: 1px solid var(--border-bright);
+    background: none; cursor: pointer; font-size: 14px;
+    transition: all 0.15s; color: var(--text-dim);
+  }
+  .action-btn:hover.approve { background: var(--accent-dim); border-color: var(--accent); color: var(--accent); }
+  .action-btn:hover.reject  { background: var(--red-dim);    border-color: var(--red);    color: var(--red); }
+  .action-btn.approve.active { background: var(--accent-dim); border-color: var(--accent); color: var(--accent); }
+  .action-btn.reject.active  { background: var(--red-dim);    border-color: var(--red);    color: var(--red); }
+
+  /* ── APPROVALS ── */
+  .approvals-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(380px, 1fr)); gap: 16px; }
+  .approval-card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 6px; padding: 16px;
+    transition: border-color 0.15s, box-shadow 0.15s; box-shadow: var(--shadow);
+  }
+  .approval-card:hover { border-color: var(--border-bright); }
+  .card-src { font-family: var(--mono); font-size: 9px; color: var(--text-dim); margin-bottom: 8px; display: flex; align-items: center; gap: 8px; }
+  .card-headline input {
+    width: 100%; background: none; border: none;
+    border-bottom: 1px solid var(--border-bright);
+    color: var(--text-bright); font-family: var(--sans); font-size: 13px; font-weight: 500;
+    padding: 4px 0; outline: none; transition: border-color 0.15s; margin-bottom: 10px;
+  }
+  .card-headline input:focus { border-color: var(--accent); }
+  .card-summary textarea {
+    width: 100%; background: rgba(255,255,255,0.02);
+    border: 1px solid var(--border); border-radius: 4px;
+    color: var(--text); font-family: var(--sans); font-size: 12px; line-height: 1.6;
+    padding: 8px; outline: none; resize: vertical; min-height: 80px;
+    transition: border-color 0.15s;
+  }
+  .card-summary textarea:focus { border-color: var(--accent); }
+  .char-count { font-family: var(--mono); font-size: 9px; color: var(--text-dim); text-align: right; margin-top: 4px; }
+  .char-count.over { color: var(--red); }
+  .card-footer { display: flex; align-items: center; justify-content: space-between; margin-top: 12px; }
+  .card-link { font-family: var(--mono); font-size: 9px; color: var(--text-dim); text-decoration: none; }
+  .card-link:hover { color: var(--accent); }
+  .generating { font-family: var(--mono); font-size: 10px; color: var(--accent); display: flex; align-items: center; gap: 6px; }
+  .btn-unapprove {
+    background: none; border: 1px solid var(--border-bright);
+    color: var(--text-dim); font-family: var(--mono); font-size: 10px;
+    padding: 4px 10px; border-radius: 4px; cursor: pointer; transition: all 0.15s;
+  }
+  .btn-unapprove:hover { border-color: var(--red); color: var(--red); }
+
+  /* ── TRASH ── */
+  .trash-table { width: 100%; border-collapse: collapse; }
+  .trash-table td { padding: 10px 12px; border-bottom: 1px solid var(--border); font-size: 12px; }
+  .trash-table tr { transition: background 0.1s; }
+  .trash-table tr:hover { background: var(--surface); }
+  .btn-restore {
+    background: none; border: 1px solid var(--border-bright);
+    color: var(--text-dim); font-family: var(--mono); font-size: 9px;
+    padding: 3px 8px; border-radius: 3px; cursor: pointer; transition: all 0.15s; margin-right: 6px;
+  }
+  .btn-restore:hover { border-color: var(--accent); color: var(--accent); }
+  .btn-delete {
+    background: none; border: 1px solid var(--border-bright);
+    color: var(--text-dim); font-family: var(--mono); font-size: 9px;
+    padding: 3px 8px; border-radius: 3px; cursor: pointer; transition: all 0.15s;
+  }
+  .btn-delete:hover { border-color: var(--red); color: var(--red); background: var(--red-dim); }
+
+  /* ── MISC ── */
+  .empty-state {
+    text-align: center; padding: 60px 20px;
+    color: var(--text-dim); font-family: var(--mono); font-size: 11px; letter-spacing: 0.08em;
+  }
+  .empty-state .icon { font-size: 32px; margin-bottom: 12px; opacity: 0.4; }
+  .placeholder-row td {
+    text-align: center; padding: 48px; font-family: var(--mono);
+    font-size: 11px; color: var(--text-dim); letter-spacing: 0.06em;
+  }
+
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .spinner {
+    width: 10px; height: 10px;
+    border: 1.5px solid var(--accent); border-top-color: transparent;
+    border-radius: 50%; animation: spin 0.7s linear infinite; display: inline-block;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">AI RISK <span>// Signal Review</span></div>
+  <nav>
+    <button class="active" onclick="showPage('feed')" id="tab-feed">
+      Feed <span class="badge badge-dim" id="badge-feed">0</span>
+    </button>
+    <button onclick="showPage('approvals')" id="tab-approvals">
+      Approved <span class="badge badge-green" id="badge-approvals">0</span>
+    </button>
+    <button onclick="showPage('trash')" id="tab-trash">
+      Trash <span class="badge badge-red" id="badge-trash">0</span>
+    </button>
+  </nav>
+  <div class="header-right">
+    <span class="last-fetched" id="last-fetched"></span>
+    <button class="btn-fetch" id="btn-fetch" onclick="fetchAllFeeds()">
+      <span class="fetch-icon">↻</span> Fetch now
+    </button>
+    <div class="theme-toggle">
+      <span class="toggle-icon">🌙</span>
+      <label class="toggle-switch">
+        <input type="checkbox" id="theme-checkbox" onchange="toggleTheme(this)">
+        <div class="toggle-track"></div>
+        <div class="toggle-thumb"></div>
+      </label>
+      <span class="toggle-icon">☀️</span>
+    </div>
+  </div>
+</header>
+
+<!-- FEED PAGE -->
+<div class="page active" id="page-feed">
+  <div class="toolbar">
+    <div class="kb-hint">
+      <span><span class="key">↑</span><span class="key">↓</span> Navigate</span>
+      <span><span class="key">Y</span> Approve</span>
+      <span><span class="key">N</span> Reject</span>
+      <span><span class="key">Space</span> Expand</span>
+    </div>
+    <div class="filters">
+      <div class="filter-group">
+        <span class="filter-label">Feed:</span>
+        <select class="filter-select" id="filter-feed" onchange="applyFilters()">
+          <option value="All">All feeds</option>
+          <option value="Cyber">Cyber</option>
+          <option value="Bio">Bio</option>
+          <option value="Loss of Control">Loss of Control</option>
+          <option value="Manipulation">Manipulation</option>
+          <option value="General">General</option>
+        </select>
+      </div>
+      <div class="filter-group">
+        <span class="filter-label">Status:</span>
+        <select class="filter-select" id="filter-status" onchange="applyFilters()">
+          <option value="All">All</option>
+          <option value="pending">Pending</option>
+          <option value="approved">Approved</option>
+          <option value="rejected">Rejected</option>
+        </select>
+      </div>
+    </div>
+  </div>
+  <div id="feed-error" style="display:none" class="fetch-error"></div>
+  <table class="feed-table">
+    <thead>
+      <tr>
+        <th style="width:36px">#</th>
+        <th>Title</th>
+        <th>Snippet</th>
+        <th style="width:110px">Feed</th>
+        <th style="width:120px">Source</th>
+        <th style="width:72px;text-align:center">Action</th>
+      </tr>
+    </thead>
+    <tbody id="feed-tbody">
+      <tr class="placeholder-row"><td colspan="6">Press "Fetch now" to load items from your RSS feeds</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- APPROVALS PAGE -->
+<div class="page" id="page-approvals">
+  <div id="approvals-container">
+    <div class="empty-state"><div class="icon">✓</div>No approved items yet.</div>
+  </div>
+</div>
+
+<!-- TRASH PAGE -->
+<div class="page" id="page-trash">
+  <div id="trash-container">
+    <div class="empty-state"><div class="icon">🗑</div>Trash is empty.</div>
+  </div>
+</div>
+
+<script>
+// ─────────────────────────────────
+// CONFIG
+// ─────────────────────────────────
+// Multiple proxies tried in order — first success wins
+const PROXY_STRATEGIES = [
+  {
+    name: 'corsproxy.io',
+    build: url => `https://corsproxy.io/?url=${encodeURIComponent(url)}`,
+    extract: async res => ({ contents: await res.text() }),
+  },
+  {
+    name: 'allorigins',
+    build: url => `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`,
+    extract: async res => res.json(),
+  },
+  {
+    name: 'htmldriven',
+    build: url => `https://cors-proxy.htmldriven.com/?url=${encodeURIComponent(url)}`,
+    extract: async res => ({ contents: await res.text() }),
+  },
+];
+
+const FEEDS = [
+  { name: 'Cyber',           cls: 'tag-cyber',   url: 'https://www.google.com/alerts/feeds/12550362470285350567/4652783915152252819' },
+  { name: 'Bio',             cls: 'tag-bio',     url: 'https://www.google.com/alerts/feeds/12550362470285350567/14826692536721148166' },
+  { name: 'Loss of Control', cls: 'tag-control', url: 'https://www.google.com/alerts/feeds/12550362470285350567/10664996783140664660' },
+  { name: 'Manipulation',    cls: 'tag-manip',   url: 'https://www.google.com/alerts/feeds/12550362470285350567/10440035689106448981' },
+  { name: 'General',         cls: 'tag-general', url: 'https://www.google.com/alerts/feeds/12550362470285350567/15397384783255878352' },
+];
+
+const LS_ITEMS     = 'aiRisk_items_v3';
+const LS_APPROVALS = 'aiRisk_approvals_v3';
+const LS_FETCHED   = 'aiRisk_fetched_v3';
+const LS_THEME     = 'aiRisk_theme_v3';
+
+// ─────────────────────────────────
+// STATE
+// ─────────────────────────────────
+const state = {
+  items: [],       // { id, title, snippet, full, url, feed, cls, date, status }
+  approvals: {},   // id → { headline, summary, generating }
+  selectedIdx: 0,
+  currentPage: 'feed',
+  filterFeed: 'All',
+  filterStatus: 'All',
+};
+
+// ─────────────────────────────────
+// PERSISTENCE
+// ─────────────────────────────────
+function save() {
+  try {
+    localStorage.setItem(LS_ITEMS,     JSON.stringify(state.items));
+    localStorage.setItem(LS_APPROVALS, JSON.stringify(state.approvals));
+  } catch(e) {}
+}
+function load() {
+  try {
+    const i = localStorage.getItem(LS_ITEMS);
+    const a = localStorage.getItem(LS_APPROVALS);
+    if (i) state.items     = JSON.parse(i);
+    if (a) state.approvals = JSON.parse(a);
+  } catch(e) {}
+}
+
+// ─────────────────────────────────
+// THEME
+// ─────────────────────────────────
+function toggleTheme(cb) {
+  document.documentElement.classList.toggle('light', cb.checked);
+  localStorage.setItem(LS_THEME, cb.checked ? 'light' : 'dark');
+}
+function initTheme() {
+  if (localStorage.getItem(LS_THEME) === 'light') {
+    document.documentElement.classList.add('light');
+    document.getElementById('theme-checkbox').checked = true;
+  }
+}
+
+// ─────────────────────────────────
+// NAV
+// ─────────────────────────────────
+function showPage(name) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('nav button').forEach(b => b.classList.remove('active'));
+  document.getElementById('page-' + name).classList.add('active');
+  document.getElementById('tab-'  + name).classList.add('active');
+  state.currentPage = name;
+  if (name === 'approvals') renderApprovals();
+  if (name === 'trash')     renderTrash();
+}
+
+// ─────────────────────────────────
+// RSS FETCH
+// ─────────────────────────────────
+function stripHtml(html) {
+  const d = document.createElement('div');
+  d.innerHTML = html;
+  return (d.textContent || d.innerText || '').trim();
+}
+
+function extractRealUrl(href) {
+  // Google Alert links wrap the real URL in a ?url= param
+  try {
+    const u = new URL(href);
+    return u.searchParams.get('url') || href;
+  } catch { return href; }
+}
+
+async function fetchWithFallback(targetUrl) {
+  const proxyErrors = [];
+  for (const proxy of PROXY_STRATEGIES) {
+    try {
+      const res = await fetch(proxy.build(targetUrl), { signal: AbortSignal.timeout(12000) });
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      const data = await proxy.extract(res);
+      const xml  = (typeof data === 'string') ? data : (data.contents || '');
+      if (!xml || xml.trim().length < 10) throw new Error('Empty response');
+      return xml;
+    } catch(e) {
+      proxyErrors.push(`${proxy.name}: ${e.message}`);
+    }
+  }
+  throw new Error(proxyErrors.join(' / '));
+}
+
+async function fetchOneFeed(feedDef) {
+  const xml = await fetchWithFallback(feedDef.url);
+  const doc = new DOMParser().parseFromString(xml, 'application/xml');
+  if (doc.querySelector('parsererror')) throw new Error('Invalid XML from proxy');
+
+  return Array.from(doc.querySelectorAll('entry')).map(entry => {
+    const rawId   = (entry.querySelector('id')?.textContent || '').trim();
+    const title   = stripHtml(entry.querySelector('title')?.textContent || 'Untitled');
+    const rawBody = entry.querySelector('content')?.textContent || entry.querySelector('summary')?.textContent || '';
+    const full    = stripHtml(rawBody);
+    const snippet = full.slice(0, 200) + (full.length > 200 ? '…' : '');
+    const href    = entry.querySelector('link')?.getAttribute('href') || '#';
+    const url     = extractRealUrl(href);
+    const date    = entry.querySelector('updated')?.textContent || entry.querySelector('published')?.textContent || '';
+    const id      = rawId || feedDef.name + '_' + encodeURIComponent(title.slice(0, 40));
+    return { id, title, snippet, full, url, feed: feedDef.name, cls: feedDef.cls, date, status: 'pending' };
+  });
+}
+
+async function fetchAllFeeds() {
+  const btn = document.getElementById('btn-fetch');
+  btn.disabled = true;
+  btn.classList.add('fetching');
+
+  const errEl = document.getElementById('feed-error');
+  errEl.style.display = 'none';
+  const errors = [];
+  let added = 0;
+
+  for (const feedDef of FEEDS) {
+    try {
+      const entries = await fetchOneFeed(feedDef);
+      for (const entry of entries) {
+        if (!state.items.some(i => i.id === entry.id)) {
+          state.items.unshift(entry);
+          added++;
+        }
+      }
+    } catch(e) {
+      errors.push(feedDef.name + ': ' + e.message);
+    }
+  }
+
+  const now = new Date();
+  localStorage.setItem(LS_FETCHED, now.toISOString());
+  updateFetchedLabel();
+
+  if (errors.length) {
+    const allFailed = errors.length === FEEDS.length;
+    const header = allFailed
+      ? '⚠ All feeds failed to load. '
+      : `⚠ ${errors.length} of ${FEEDS.length} feeds failed. `;
+    errEl.innerHTML = header
+      + '<details style="display:inline"><summary style="cursor:pointer;color:inherit">Details</summary><pre style="margin-top:6px;font-size:9px;opacity:.8;white-space:pre-wrap">'
+      + errors.join('\n')
+      + '</pre></details>'
+      + (allFailed ? '<br><small style="opacity:.7">All CORS proxies were unreachable. Check your network connection or try again shortly.</small>' : '');
+    errEl.style.display = 'block';
+  }
+
+  save();
+  state.selectedIdx = 0;
+  renderFeed();
+
+  btn.disabled = false;
+  btn.classList.remove('fetching');
+}
+
+function updateFetchedLabel() {
+  const ts = localStorage.getItem(LS_FETCHED);
+  const el = document.getElementById('last-fetched');
+  if (!ts) { el.textContent = ''; return; }
+  const d = new Date(ts);
+  const p = n => String(n).padStart(2,'0');
+  el.textContent = `Fetched ${p(d.getUTCHours())}:${p(d.getUTCMinutes())} UTC`;
+}
+
+// ─────────────────────────────────
+// FILTERS
+// ─────────────────────────────────
+function applyFilters() {
+  state.filterFeed   = document.getElementById('filter-feed').value;
+  state.filterStatus = document.getElementById('filter-status').value;
+  const v = getVisible();
+  state.selectedIdx = v.length ? v[0].idx : 0;
+  renderFeed();
+}
+
+function getVisible() {
+  return state.items
+    .map((item, idx) => ({ item, idx }))
+    .filter(({ item }) => {
+      if (item.status === 'deleted') return false;
+      if (state.filterFeed   !== 'All' && item.feed   !== state.filterFeed)   return false;
+      if (state.filterStatus !== 'All' && item.status !== state.filterStatus) return false;
+      return true;
+    });
+}
+
+// ─────────────────────────────────
+// FEED RENDER
+// ─────────────────────────────────
+function renderFeed() {
+  const tbody  = document.getElementById('feed-tbody');
+  const visible = getVisible();
+
+  if (!state.items.length) {
+    tbody.innerHTML = `<tr class="placeholder-row"><td colspan="6">Press "Fetch now" to load items from your RSS feeds</td></tr>`;
+    updateBadges(); return;
+  }
+  if (!visible.length) {
+    tbody.innerHTML = `<tr class="placeholder-row"><td colspan="6">No items match the current filters</td></tr>`;
+    updateBadges(); return;
+  }
+
+  tbody.innerHTML = '';
+  visible.forEach(({ item, idx: ri }, vp) => {
+    const isSelected = ri === state.selectedIdx;
+    const tr = document.createElement('tr');
+    tr.dataset.idx = ri;
+    if (isSelected)           tr.classList.add('selected');
+    if (item.status==='approved') tr.classList.add('approved');
+    if (item.status==='rejected') tr.classList.add('rejected');
+
+    const dot = item.status==='approved' ? 'dot-approved' : item.status==='rejected' ? 'dot-rejected' : 'dot-pending';
+    let host = '—';
+    try { host = new URL(item.url).hostname.replace(/^www\./,''); } catch {}
+
+    tr.innerHTML = `
+      <td class="td-idx">${vp+1}</td>
+      <td class="td-title">
+        <span class="status-dot ${dot}"></span><span class="title-text">${esc(item.title)}</span>
+      </td>
+      <td class="td-snippet">
+        <span class="snippet-short" id="ss${vp}">${esc(item.snippet)}<button class="expand-btn" onclick="toggleSnippet(event,${vp})">+</button></span>
+        <span class="snippet-full"  id="sf${vp}">${esc(item.full)}<button class="expand-btn" onclick="toggleSnippet(event,${vp})">−</button></span>
+      </td>
+      <td><span class="tag ${item.cls}">${esc(item.feed)}</span></td>
+      <td class="td-link"><a href="${esc(item.url)}" target="_blank" rel="noreferrer">${esc(host)}</a></td>
+      <td class="td-actions">
+        <button class="action-btn approve ${item.status==='approved'?'active':''}" onclick="approveItem(event,${ri})" title="Approve (Y)">✓</button>
+        <button class="action-btn reject  ${item.status==='rejected'?'active':''}" onclick="rejectItem(event,${ri})"  title="Reject (N)">✕</button>
+      </td>`;
+
+    tr.addEventListener('click', e => {
+      if (e.target.closest('.action-btn,.expand-btn,a')) return;
+      state.selectedIdx = ri;
+      renderFeed();
+    });
+    tbody.appendChild(tr);
+  });
+  updateBadges();
+}
+
+function toggleSnippet(e, vp) {
+  e.stopPropagation();
+  const s = document.getElementById('ss'+vp);
+  const f = document.getElementById('sf'+vp);
+  const exp = f.style.display === 'inline';
+  s.style.display = exp ? 'inline' : 'none';
+  f.style.display = exp ? 'none'   : 'inline';
+}
+
+// ─────────────────────────────────
+// APPROVE / REJECT
+// ─────────────────────────────────
+function approveItem(e, idx) {
+  if (e) e.stopPropagation();
+  const item = state.items[idx];
+  if (!item || item.status==='deleted') return;
+  if (item.status==='approved') {
+    item.status = 'pending';
+    delete state.approvals[item.id];
+  } else {
+    item.status = 'approved';
+    generateApproval(item);
+  }
+  save(); renderFeed();
+}
+
+function rejectItem(e, idx) {
+  if (e) e.stopPropagation();
+  const item = state.items[idx];
+  if (!item || item.status==='deleted') return;
+  if (item.status==='approved') delete state.approvals[item.id];
+  item.status = 'rejected';
+  save(); renderFeed();
+}
+
+function updateBadges() {
+  document.getElementById('badge-feed').textContent      = state.items.filter(i=>i.status!=='deleted').length;
+  document.getElementById('badge-approvals').textContent = state.items.filter(i=>i.status==='approved').length;
+  document.getElementById('badge-trash').textContent     = state.items.filter(i=>i.status==='rejected').length;
+}
+
+// ─────────────────────────────────
+// KEYBOARD
+// ─────────────────────────────────
+document.addEventListener('keydown', e => {
+  if (state.currentPage !== 'feed') return;
+  if (['INPUT','TEXTAREA','SELECT'].includes(e.target.tagName)) return;
+
+  const vis = getVisible();
+  const pos = vis.findIndex(v => v.idx === state.selectedIdx);
+
+  if (e.key==='ArrowDown') {
+    e.preventDefault();
+    if (pos < vis.length-1) state.selectedIdx = vis[pos+1].idx;
+    renderFeed(); scrollToSelected();
+  } else if (e.key==='ArrowUp') {
+    e.preventDefault();
+    if (pos > 0) state.selectedIdx = vis[pos-1].idx;
+    renderFeed(); scrollToSelected();
+  } else if (e.key==='y'||e.key==='Y') {
+    approveItem(null, state.selectedIdx);
+  } else if (e.key==='n'||e.key==='N') {
+    rejectItem(null, state.selectedIdx);
+  } else if (e.key===' ') {
+    e.preventDefault();
+    if (pos !== -1) toggleSnippet({ stopPropagation:()=>{} }, pos);
+  }
+});
+
+function scrollToSelected() {
+  document.querySelector(`tr[data-idx="${state.selectedIdx}"]`)
+    ?.scrollIntoView({ block:'nearest', behavior:'smooth' });
+}
+
+// ─────────────────────────────────
+// AI GENERATION
+// ─────────────────────────────────
+async function generateApproval(item) {
+  state.approvals[item.id] = { headline:'', summary:'', generating:true };
+  if (state.currentPage==='approvals') renderApprovals();
+  try {
+    const res  = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'Content-Type':'application/json' },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 1000,
+        messages: [{ role:'user', content:
+          `You are an editor for an AI risk newsletter. Generate:
+1. A punchy headline (max 80 chars)
+2. A summary of exactly 220 characters
+
+Title: ${item.title}
+Content: ${item.full || item.snippet}
+
+Respond ONLY with valid JSON, no markdown:
+{"headline":"...","summary":"..."}` }]
+      })
+    });
+    const data   = await res.json();
+    const raw    = (data.content||[]).map(c=>c.text||'').join('');
+    const parsed = JSON.parse(raw.replace(/```json|```/g,'').trim());
+    state.approvals[item.id] = { headline: parsed.headline||item.title, summary: parsed.summary||item.snippet, generating:false };
+  } catch {
+    state.approvals[item.id] = { headline: item.title, summary: item.snippet, generating:false };
+  }
+  save();
+  if (state.currentPage==='approvals') renderApprovals();
+}
+
+// ─────────────────────────────────
+// APPROVALS RENDER
+// ─────────────────────────────────
+function renderApprovals() {
+  const container = document.getElementById('approvals-container');
+  const approved  = state.items.filter(i=>i.status==='approved');
+  if (!approved.length) {
+    container.innerHTML = '<div class="empty-state"><div class="icon">✓</div>No approved items yet.</div>';
+    return;
+  }
+  container.innerHTML = '<div class="approvals-grid" id="ag"></div>';
+  const grid = document.getElementById('ag');
+  approved.forEach(item => {
+    const a = state.approvals[item.id] || { headline:item.title, summary:item.snippet, generating:false };
+    let host=''; try { host=new URL(item.url).hostname.replace(/^www\./,''); } catch {}
+    const sid = safeId(item.id);
+    const card = document.createElement('div');
+    card.className = 'approval-card';
+    card.innerHTML = `
+      <div class="card-src">
+        <span class="tag ${item.cls}">${esc(item.feed)}</span>
+        <span style="flex:1"></span>
+        ${a.generating ? '<span class="generating"><span class="spinner"></span> Generating…</span>' : ''}
+      </div>
+      <div class="card-headline">
+        <input type="text" value="${esc(a.headline)}" placeholder="Headline…"
+          oninput="onHL('${escQ(item.id)}',this.value)">
+      </div>
+      <div class="card-summary">
+        <textarea rows="4" placeholder="Summary…"
+          oninput="onSum('${escQ(item.id)}',this.value,'${sid}')">${esc(a.summary)}</textarea>
+        <div class="char-count ${(a.summary||'').length>220?'over':''}" id="cc${sid}">${(a.summary||'').length}/220</div>
+      </div>
+      <div class="card-footer">
+        <a href="${esc(item.url)}" target="_blank" rel="noreferrer" class="card-link">${esc(host)} ↗</a>
+        <button class="btn-unapprove" onclick="unapprove('${escQ(item.id)}')">Move to pending</button>
+      </div>`;
+    grid.appendChild(card);
+  });
+}
+
+function onHL(id, val)  { if (!state.approvals[id]) state.approvals[id]={}; state.approvals[id].headline=val; save(); }
+function onSum(id, val, sid) {
+  if (!state.approvals[id]) state.approvals[id]={};
+  state.approvals[id].summary=val; save();
+  const el=document.getElementById('cc'+sid);
+  if (el) { el.textContent=`${val.length}/220`; el.className='char-count'+(val.length>220?' over':''); }
+}
+function unapprove(id) {
+  const item=state.items.find(i=>i.id===id);
+  if (item) { item.status='pending'; delete state.approvals[id]; }
+  save(); updateBadges(); renderApprovals();
+}
+
+// ─────────────────────────────────
+// TRASH RENDER
+// ─────────────────────────────────
+function renderTrash() {
+  const container = document.getElementById('trash-container');
+  const rejected  = state.items.filter(i=>i.status==='rejected');
+  if (!rejected.length) {
+    container.innerHTML = '<div class="empty-state"><div class="icon">🗑</div>Trash is empty.</div>';
+    return;
+  }
+  const th = s => `<th style="padding:8px 12px;font-family:var(--mono);font-size:9px;letter-spacing:.1em;color:var(--text-dim);text-transform:uppercase">${s}</th>`;
+  container.innerHTML = `<table class="trash-table" style="width:100%"><thead><tr style="border-bottom:1px solid var(--border-bright)">${th('Title')}${th('Feed')}${th('Actions')}</tr></thead><tbody id="tt"></tbody></table>`;
+  const tbody = document.getElementById('tt');
+  rejected.forEach(item => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td style="color:var(--text-bright)">${esc(item.title)}</td>
+      <td><span class="tag ${item.cls}">${esc(item.feed)}</span></td>
+      <td>
+        <button class="btn-restore" onclick="restore('${escQ(item.id)}')">↩ Restore</button>
+        <button class="btn-delete"  onclick="permDelete('${escQ(item.id)}')">✕ Delete permanently</button>
+      </td>`;
+    tbody.appendChild(tr);
+  });
+}
+
+function restore(id) {
+  const item=state.items.find(i=>i.id===id);
+  if (item) item.status='pending';
+  save(); updateBadges(); renderTrash(); renderFeed();
+}
+function permDelete(id) {
+  const item=state.items.find(i=>i.id===id);
+  if (item) item.status='deleted';
+  save(); updateBadges(); renderTrash(); renderFeed();
+}
+
+// ─────────────────────────────────
+// UTILS
+// ─────────────────────────────────
+function esc(s)  { return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function escQ(s) { return (s||'').replace(/\\/g,'\\\\').replace(/'/g,"\\'"); }
+function safeId(s) { try { return btoa(s).replace(/[^a-zA-Z0-9]/g,'').slice(0,24); } catch { return Math.random().toString(36).slice(2); } }
+
+// ─────────────────────────────────
+// BOOT
+// ─────────────────────────────────
+initTheme();
+load();
+updateFetchedLabel();
+renderFeed();
+</script>
+</body>
+</html>
